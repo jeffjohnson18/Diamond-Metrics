@@ -171,19 +171,19 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
             pitcher_names = request.data.get('pitcher_names', [])
             logger.info(f"Received pitcher names: {pitcher_names}")
             
-            if not pitcher_names:
-                response = Response(
-                    {'detail': 'pitcher_names array cannot be empty'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-                log_response(response, "FavoritePitcherViewSet.save_favorites")
-                return response
-
-            logger.info(f"Attempting to save favorites for user {username}: {pitcher_names}")
-            
             # Clear existing favorites
             deleted_count = FavoritePitcher.objects.filter(user=user).delete()
             logger.info(f"Cleared existing favorites. Deleted count: {deleted_count}")
+
+            # If pitcher_names is null or empty, just return empty response
+            if not pitcher_names:
+                logger.info("No pitcher names provided, returning empty favorites list")
+                response = Response({
+                    'favorites': [],
+                    'count': 0
+                }, status=status.HTTP_200_OK)
+                log_response(response, "FavoritePitcherViewSet.save_favorites")
+                return response
 
             # Create new favorites
             saved_favorites = []
