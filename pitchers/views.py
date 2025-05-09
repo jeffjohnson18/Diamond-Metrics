@@ -6,10 +6,30 @@ from django.contrib.auth.models import User
 from .models import Pitcher, FavoritePitcher
 from .serializers import UserSerializer, PitcherSerializer, FavoritePitcherSerializer
 import logging
+from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 
 # Create your views here.
+
+class UserInfoView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = request.user
+            logger.info(f"Retrieved user info for {user.username}")
+            return Response({
+                'user_id': user.id,
+                'username': user.username,
+                'email': user.email
+            })
+        except Exception as e:
+            logger.error(f"Error retrieving user info: {str(e)}", exc_info=True)
+            return Response(
+                {'detail': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -51,12 +71,26 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        username = self.request.query_params.get('username')
+        if username:
+            try:
+                user = User.objects.get(username=username)
+                return FavoritePitcher.objects.filter(user=user)
+            except User.DoesNotExist:
+                return FavoritePitcher.objects.none()
         return FavoritePitcher.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         try:
-            logger.info(f"Attempting to create favorite with data: {self.request.data}")
-            serializer.save(user=self.request.user)
+            username = self.request.query_params.get('username')
+            if username:
+                try:
+                    user = User.objects.get(username=username)
+                    serializer.save(user=user)
+                except User.DoesNotExist:
+                    raise serializers.ValidationError({'username': 'User not found'})
+            else:
+                serializer.save(user=self.request.user)
             logger.info("Successfully created favorite")
         except Exception as e:
             logger.error(f"Error creating favorite: {str(e)}", exc_info=True)
@@ -65,18 +99,32 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def save_favorites(self, request):
         try:
+            username = request.query_params.get('username')
+            if not username:
+                return Response(
+                    {'detail': 'username parameter is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            try:
+                user = User.objects.get(username=username)
+            except User.DoesNotExist:
+                return Response(
+                    {'detail': f'User {username} not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
             pitcher_names = request.data.get('pitcher_names', [])
-            
             if not pitcher_names:
                 return Response(
                     {'detail': 'pitcher_names array cannot be empty'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            logger.info(f"Attempting to save favorites for user {request.user.username}: {pitcher_names}")
+            logger.info(f"Attempting to save favorites for user {username}: {pitcher_names}")
             
             # Clear existing favorites
-            self.get_queryset().delete()
+            FavoritePitcher.objects.filter(user=user).delete()
             logger.info("Cleared existing favorites")
 
             # Create new favorites
@@ -85,7 +133,7 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
                 try:
                     pitcher = Pitcher.objects.get(player_name__iexact=name)
                     favorite = FavoritePitcher.objects.create(
-                        user=request.user,
+                        user=user,
                         pitcher=pitcher
                     )
                     saved_favorites.append({
@@ -112,9 +160,24 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def my_favorites(self, request):
         try:
-            favorites = self.get_queryset()
+            username = request.query_params.get('username')
+            if not username:
+                return Response(
+                    {'detail': 'username parameter is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            try:
+                user = User.objects.get(username=username)
+            except User.DoesNotExist:
+                return Response(
+                    {'detail': f'User {username} not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            favorites = FavoritePitcher.objects.filter(user=user)
             serializer = self.get_serializer(favorites, many=True)
-            logger.info(f"Retrieved {len(favorites)} favorites for user {request.user.username}")
+            logger.info(f"Retrieved {len(favorites)} favorites for user {username}")
             return Response(serializer.data)
         except Exception as e:
             logger.error(f"Error retrieving favorites: {str(e)}", exc_info=True)
@@ -126,9 +189,24 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def get_all_favorites(self, request):
         try:
-            favorites = self.get_queryset()
+            username = request.query_params.get('username')
+            if not username:
+                return Response(
+                    {'detail': 'username parameter is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            try:
+                user = User.objects.get(username=username)
+            except User.DoesNotExist:
+                return Response(
+                    {'detail': f'User {username} not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            favorites = FavoritePitcher.objects.filter(user=user)
             serializer = self.get_serializer(favorites, many=True)
-            logger.info(f"Retrieved {len(favorites)} favorites for user {request.user.username}")
+            logger.info(f"Retrieved {len(favorites)} favorites for user {username}")
             return Response({
                 'favorites': serializer.data,
                 'count': len(favorites)
@@ -143,9 +221,24 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['delete'])
     def clear_all(self, request):
         try:
-            count = self.get_queryset().count()
-            self.get_queryset().delete()
-            logger.info(f"Successfully deleted all {count} favorites for user {request.user.username}")
+            username = request.query_params.get('username')
+            if not username:
+                return Response(
+                    {'detail': 'username parameter is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            try:
+                user = User.objects.get(username=username)
+            except User.DoesNotExist:
+                return Response(
+                    {'detail': f'User {username} not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            count = FavoritePitcher.objects.filter(user=user).count()
+            FavoritePitcher.objects.filter(user=user).delete()
+            logger.info(f"Successfully deleted all {count} favorites for user {username}")
             return Response(
                 {'message': f'Successfully deleted all {count} favorites'},
                 status=status.HTTP_200_OK
