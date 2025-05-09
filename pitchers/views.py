@@ -76,6 +76,33 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=False, methods=['delete'])
+    def delete_by_name(self, request):
+        try:
+            player_name = request.query_params.get('player_name')
+            if not player_name:
+                return Response(
+                    {'error': 'player_name parameter is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            favorite = self.get_queryset().filter(pitcher__player_name__iexact=player_name).first()
+            if not favorite:
+                return Response(
+                    {'error': f'No favorite found for player: {player_name}'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            favorite.delete()
+            logger.info(f"Successfully deleted favorite for player: {player_name}")
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            logger.error(f"Error deleting favorite: {str(e)}", exc_info=True)
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     def destroy(self, request, *args, **kwargs):
         try:
             instance = self.get_object()
