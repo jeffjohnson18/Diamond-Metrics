@@ -57,20 +57,17 @@ if IS_HEROKU_APP:
     # list the expected hostnames explicitly in production to prevent HTTP Host header attacks. See:
     # https://docs.djangoproject.com/en/5.2/ref/settings/#std-setting-ALLOWED_HOSTS
     ALLOWED_HOSTS = ["*"]
-
-    # Redirect all non-HTTPS requests to HTTPS. This requires that:
-    # 1. Your app has a TLS/SSL certificate, which all `*.herokuapp.com` domains do by default.
-    #    When using a custom domain, you must configure one. See:
-    #    https://devcenter.heroku.com/articles/automated-certificate-management
-    # 2. Your app's WSGI web server is configured to use the `X-Forwarded-Proto` headers set by
-    #    the Heroku Router (otherwise you may encounter infinite HTTP 301 redirects). See this
-    #    app's `gunicorn.conf.py` for how this is done when using gunicorn.
-    #
-    # For maximum security, consider enabling HTTP Strict Transport Security (HSTS) headers too:
-    # https://docs.djangoproject.com/en/5.2/ref/middleware/#http-strict-transport-security
     SECURE_SSL_REDIRECT = True
 else:
     ALLOWED_HOSTS = [".localhost", "127.0.0.1", "[::1]", "0.0.0.0", "[::]"]
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_SSL_REDIRECT = False
+    SECURE_PROXY_SSL_HEADER = None
+    SECURE_HSTS_SECONDS = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
 
 
 # Application definition

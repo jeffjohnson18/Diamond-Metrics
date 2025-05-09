@@ -47,30 +47,44 @@ class PitcherSerializer(serializers.ModelSerializer):
 
 class FavoritePitcherSerializer(serializers.ModelSerializer):
     pitcher = PitcherSerializer(read_only=True)
-    player_name = serializers.CharField(write_only=True)
+    pitcher_id = serializers.PrimaryKeyRelatedField(
+        queryset=Pitcher.objects.all(),
+        write_only=True,
+        source='pitcher',
+        required=False
+    )
+    player_name = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = FavoritePitcher
-        fields = ('id', 'pitcher', 'player_name', 'created_at')
+        fields = ('id', 'pitcher', 'pitcher_id', 'player_name', 'created_at')
 
     def create(self, validated_data):
-        player_name = validated_data.pop('player_name')
         try:
-            # Try exact match first
-            try:
-                pitcher = Pitcher.objects.get(player_name__iexact=player_name)
-            except Pitcher.DoesNotExist:
-                # If exact match fails, try to match by last name, first name format
-                name_parts = player_name.split()
-                if len(name_parts) >= 2:
-                    last_name = name_parts[-1]
-                    first_name = ' '.join(name_parts[:-1])
-                    formatted_name = f"{last_name}, {first_name}"
-                    pitcher = Pitcher.objects.get(player_name__iexact=formatted_name)
-                else:
-                    raise Pitcher.DoesNotExist
+            # If pitcher_id is provided, use it directly
+            if 'pitcher' in validated_data:
+                return super().create(validated_data)
             
-            validated_data['pitcher'] = pitcher
-            return super().create(validated_data)
+            # If player_name is provided, look up the pitcher
+            if 'player_name' in validated_data:
+                player_name = validated_data.pop('player_name')
+                try:
+                    # Try exact match first
+                    pitcher = Pitcher.objects.get(player_name__iexact=player_name)
+                except Pitcher.DoesNotExist:
+                    # If exact match fails, try to match by last name, first name format
+                    name_parts = player_name.split()
+                    if len(name_parts) >= 2:
+                        last_name = name_parts[-1]
+                        first_name = ' '.join(name_parts[:-1])
+                        formatted_name = f"{last_name}, {first_name}"
+                        pitcher = Pitcher.objects.get(player_name__iexact=formatted_name)
+                    else:
+                        raise Pitcher.DoesNotExist
+                
+                validated_data['pitcher'] = pitcher
+                return super().create(validated_data)
+            
+            raise serializers.ValidationError({'error': 'Either pitcher_id or player_name must be provided'})
         except Pitcher.DoesNotExist:
             raise serializers.ValidationError({'player_name': f'Pitcher with name "{player_name}" does not exist'}) 

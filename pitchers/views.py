@@ -54,20 +54,37 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
         return FavoritePitcher.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        try:
+            logger.info(f"Attempting to create favorite with data: {self.request.data}")
+            serializer.save(user=self.request.user)
+            logger.info("Successfully created favorite")
+        except Exception as e:
+            logger.error(f"Error creating favorite: {str(e)}", exc_info=True)
+            raise
 
     @action(detail=False, methods=['get'])
     def my_favorites(self, request):
-        favorites = self.get_queryset()
-        serializer = self.get_serializer(favorites, many=True)
-        return Response(serializer.data)
+        try:
+            favorites = self.get_queryset()
+            serializer = self.get_serializer(favorites, many=True)
+            logger.info(f"Retrieved {len(favorites)} favorites for user {request.user.username}")
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Error retrieving favorites: {str(e)}", exc_info=True)
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def destroy(self, request, *args, **kwargs):
         try:
             instance = self.get_object()
+            logger.info(f"Attempting to delete favorite {instance.id} for user {request.user.username}")
             self.perform_destroy(instance)
+            logger.info("Successfully deleted favorite")
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
+            logger.error(f"Error deleting favorite: {str(e)}", exc_info=True)
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
