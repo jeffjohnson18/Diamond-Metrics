@@ -77,6 +77,23 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
             )
 
     @action(detail=False, methods=['delete'])
+    def clear_all(self, request):
+        try:
+            count = self.get_queryset().count()
+            self.get_queryset().delete()
+            logger.info(f"Successfully deleted all {count} favorites for user {request.user.username}")
+            return Response(
+                {'message': f'Successfully deleted all {count} favorites'},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            logger.error(f"Error clearing favorites: {str(e)}", exc_info=True)
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=['delete'])
     def delete_by_name(self, request):
         try:
             player_name = request.query_params.get('player_name')
@@ -86,8 +103,24 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            favorite = self.get_queryset().filter(pitcher__player_name__iexact=player_name).first()
+            logger.info(f"Attempting to delete favorite for player: {player_name}")
+            
+            # First try exact match
+            favorite = self.get_queryset().filter(pitcher__player_name=player_name).first()
+            
+            # If no exact match, try case-insensitive match
             if not favorite:
+                logger.info(f"No exact match found, trying case-insensitive match")
+                favorite = self.get_queryset().filter(pitcher__player_name__iexact=player_name).first()
+            
+            # If still no match, try removing any extra spaces
+            if not favorite:
+                logger.info(f"No case-insensitive match found, trying with normalized spaces")
+                normalized_name = ' '.join(player_name.split())
+                favorite = self.get_queryset().filter(pitcher__player_name__iexact=normalized_name).first()
+
+            if not favorite:
+                logger.warning(f"No favorite found for player: {player_name}")
                 return Response(
                     {'error': f'No favorite found for player: {player_name}'},
                     status=status.HTTP_404_NOT_FOUND
