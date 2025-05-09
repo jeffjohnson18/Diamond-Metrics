@@ -224,7 +224,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'format': '\n{levelname} {asctime}\n{message}',
             'style': '{',
         },
         'simple': {
@@ -248,15 +248,10 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
-        'django.request': {
+        'pitchers': {  # This matches the logger name we're using in views.py
             'handlers': ['console'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
-        'pitchers': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False,
+            'level': 'INFO',
+            'propagate': True,
         },
     },
 }
