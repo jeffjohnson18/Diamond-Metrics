@@ -50,41 +50,31 @@ class FavoritePitcherSerializer(serializers.ModelSerializer):
     pitcher_id = serializers.PrimaryKeyRelatedField(
         queryset=Pitcher.objects.all(),
         write_only=True,
-        source='pitcher',
-        required=False
+        source='pitcher'
     )
-    player_name = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = FavoritePitcher
-        fields = ('id', 'pitcher', 'pitcher_id', 'player_name', 'created_at')
+        fields = ('id', 'pitcher', 'pitcher_id', 'created_at')
+
+    def validate(self, data):
+        logger.info(f"Validating data: {data}")
+        if 'pitcher_id' not in data:
+            raise serializers.ValidationError(
+                "pitcher_id is required"
+            )
+        return data
 
     def create(self, validated_data):
         try:
-            # If pitcher_id is provided, use it directly
-            if 'pitcher' in validated_data:
-                return super().create(validated_data)
-            
-            # If player_name is provided, look up the pitcher
-            if 'player_name' in validated_data:
-                player_name = validated_data.pop('player_name')
-                try:
-                    # Try exact match first
-                    pitcher = Pitcher.objects.get(player_name__iexact=player_name)
-                except Pitcher.DoesNotExist:
-                    # If exact match fails, try to match by last name, first name format
-                    name_parts = player_name.split()
-                    if len(name_parts) >= 2:
-                        last_name = name_parts[-1]
-                        first_name = ' '.join(name_parts[:-1])
-                        formatted_name = f"{last_name}, {first_name}"
-                        pitcher = Pitcher.objects.get(player_name__iexact=formatted_name)
-                    else:
-                        raise Pitcher.DoesNotExist
-                
+            logger.info(f"Creating favorite with data: {validated_data}")
+            pitcher_id = validated_data.pop('pitcher_id')
+            try:
+                pitcher = Pitcher.objects.get(id=pitcher_id)
                 validated_data['pitcher'] = pitcher
                 return super().create(validated_data)
-            
-            raise serializers.ValidationError({'error': 'Either pitcher_id or player_name must be provided'})
-        except Pitcher.DoesNotExist:
-            raise serializers.ValidationError({'player_name': f'Pitcher with name "{player_name}" does not exist'}) 
+            except Pitcher.DoesNotExist:
+                raise serializers.ValidationError({'pitcher_id': f'Pitcher with id {pitcher_id} does not exist'})
+        except Exception as e:
+            logger.error(f"Error creating favorite: {str(e)}", exc_info=True)
+            raise 
