@@ -47,12 +47,17 @@ class PitcherSerializer(serializers.ModelSerializer):
 
 class FavoritePitcherSerializer(serializers.ModelSerializer):
     pitcher = PitcherSerializer(read_only=True)
-    pitcher_id = serializers.PrimaryKeyRelatedField(
-        queryset=Pitcher.objects.all(),
-        write_only=True,
-        source='pitcher'
-    )
+    player_name = serializers.CharField(write_only=True)
 
     class Meta:
         model = FavoritePitcher
-        fields = ('id', 'pitcher', 'pitcher_id', 'created_at') 
+        fields = ('id', 'pitcher', 'player_name', 'created_at')
+
+    def create(self, validated_data):
+        player_name = validated_data.pop('player_name')
+        try:
+            pitcher = Pitcher.objects.get(player_name=player_name)
+            validated_data['pitcher'] = pitcher
+            return super().create(validated_data)
+        except Pitcher.DoesNotExist:
+            raise serializers.ValidationError({'player_name': f'Pitcher with name "{player_name}" does not exist'}) 
