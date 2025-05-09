@@ -62,6 +62,53 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
             logger.error(f"Error creating favorite: {str(e)}", exc_info=True)
             raise
 
+    @action(detail=False, methods=['post'])
+    def save_favorites(self, request):
+        try:
+            pitcher_names = request.data.get('pitcher_names', [])
+            
+            if not pitcher_names:
+                return Response(
+                    {'detail': 'pitcher_names array cannot be empty'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            logger.info(f"Attempting to save favorites for user {request.user.username}: {pitcher_names}")
+            
+            # Clear existing favorites
+            self.get_queryset().delete()
+            logger.info("Cleared existing favorites")
+
+            # Create new favorites
+            saved_favorites = []
+            for name in pitcher_names:
+                try:
+                    pitcher = Pitcher.objects.get(player_name__iexact=name)
+                    favorite = FavoritePitcher.objects.create(
+                        user=request.user,
+                        pitcher=pitcher
+                    )
+                    saved_favorites.append({
+                        'pitcher_name': pitcher.player_name
+                    })
+                    logger.info(f"Created favorite for {pitcher.player_name}")
+                except Pitcher.DoesNotExist:
+                    logger.warning(f"Pitcher not found: {name}")
+                    continue
+
+            logger.info(f"Successfully saved {len(saved_favorites)} favorites")
+            return Response({
+                'favorites': saved_favorites,
+                'count': len(saved_favorites)
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error saving favorites: {str(e)}", exc_info=True)
+            return Response(
+                {'detail': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     @action(detail=False, methods=['get'])
     def my_favorites(self, request):
         try:
