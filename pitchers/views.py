@@ -183,7 +183,17 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
             saved_favorites = []
             for name in pitcher_names:
                 try:
-                    pitcher = Pitcher.objects.get(player_name__iexact=name)
+                    # Try to get existing pitcher or create new one
+                    pitcher, created = Pitcher.objects.get_or_create(
+                        player_name=name,
+                        defaults={
+                            'player_name': name,
+                            # Add any other required fields with default values
+                        }
+                    )
+                    if created:
+                        logger.info(f"Created new pitcher record for {name}")
+                    
                     favorite = FavoritePitcher.objects.create(
                         user=user,
                         pitcher=pitcher
@@ -192,8 +202,8 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
                         'pitcher_name': pitcher.player_name
                     })
                     logger.info(f"Created favorite for {pitcher.player_name}")
-                except Pitcher.DoesNotExist:
-                    logger.warning(f"Pitcher not found: {name}")
+                except Exception as e:
+                    logger.error(f"Error creating favorite for {name}: {str(e)}")
                     continue
 
             logger.info(f"Successfully saved {len(saved_favorites)} favorites")
