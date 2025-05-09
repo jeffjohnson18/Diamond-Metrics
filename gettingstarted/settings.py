@@ -138,22 +138,23 @@ WSGI_APPLICATION = "gettingstarted.wsgi.application"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 if IS_HEROKU_APP:
-    # In production on Heroku the database configuration is derived from the `DATABASE_URL`
-    # environment variable by the dj-database-url package. `DATABASE_URL` will be set
-    # automatically by Heroku when a database addon is attached to your Heroku app. See:
-    # https://devcenter.heroku.com/articles/provisioning-heroku-postgres#application-config-vars
-    # https://github.com/jazzband/dj-database-url
     DATABASES = {
-        "default": dj_database_url.config(
-            env="DATABASE_URL",
-            conn_max_age=600,
-            conn_health_checks=True,
-            ssl_require=True,
-        ),
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': 'zp6mn18t0oh5kfrj',
+            'USER': 'evwvcfdm0zf1rgt1',
+            'PASSWORD': 'x7erhvf6p6apasgr',
+            'HOST': 'e764qqay0xlsc4cz.cbetxkdyhwsb.us-east-1.rds.amazonaws.com',
+            'PORT': '3306',
+            'OPTIONS': {
+                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+                'charset': 'utf8mb4',
+            }
+        }
     }
 else:
     # When running locally in development or in CI, a sqlite database file will be used instead
-    # to simplify initial setup. Longer term it's recommended to use Postgres locally too.
+    # to simplify initial setup. Longer term it's recommended to use MySQL locally too.
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -276,3 +277,28 @@ SIMPLE_JWT = {
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = True  # Only for development
 CORS_ALLOW_CREDENTIALS = True
+
+# Add these settings for production
+CORS_ALLOWED_ORIGINS = [
+    "https://moundreport-02d207132db6.herokuapp.com",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+
+# Ensure CSRF settings are properly configured
+CSRF_TRUSTED_ORIGINS = [
+    "https://moundreport-02d207132db6.herokuapp.com",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+
+# Ensure proper security settings for production
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True

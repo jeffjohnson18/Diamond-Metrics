@@ -18,6 +18,16 @@ class UserViewSet(viewsets.ModelViewSet):
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response({
+                'user': UserSerializer(user, context=self.get_serializer_context()).data,
+                'message': 'User Created Successfully'
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 class PitcherViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Pitcher.objects.all()
     serializer_class = PitcherSerializer
