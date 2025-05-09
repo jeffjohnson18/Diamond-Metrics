@@ -5,6 +5,9 @@ from rest_framework.response import Response
 from django.contrib.auth.models import User
 from .models import Pitcher, FavoritePitcher
 from .serializers import UserSerializer, PitcherSerializer, FavoritePitcherSerializer
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Create your views here.
 
@@ -19,14 +22,24 @@ class UserViewSet(viewsets.ModelViewSet):
         return [permissions.IsAuthenticated()]
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
+        try:
+            logger.info(f"Attempting to create user with data: {request.data}")
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                user = serializer.save()
+                logger.info(f"Successfully created user: {user.username}")
+                return Response({
+                    'user': UserSerializer(user, context=self.get_serializer_context()).data,
+                    'message': 'User Created Successfully'
+                }, status=status.HTTP_201_CREATED)
+            logger.error(f"Validation errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Error creating user: {str(e)}", exc_info=True)
             return Response({
-                'user': UserSerializer(user, context=self.get_serializer_context()).data,
-                'message': 'User Created Successfully'
-            }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                'error': str(e),
+                'detail': 'An error occurred while creating the user'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class PitcherViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Pitcher.objects.all()
