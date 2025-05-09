@@ -56,7 +56,20 @@ class FavoritePitcherSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         player_name = validated_data.pop('player_name')
         try:
-            pitcher = Pitcher.objects.get(player_name=player_name)
+            # Try exact match first
+            try:
+                pitcher = Pitcher.objects.get(player_name__iexact=player_name)
+            except Pitcher.DoesNotExist:
+                # If exact match fails, try to match by last name, first name format
+                name_parts = player_name.split()
+                if len(name_parts) >= 2:
+                    last_name = name_parts[-1]
+                    first_name = ' '.join(name_parts[:-1])
+                    formatted_name = f"{last_name}, {first_name}"
+                    pitcher = Pitcher.objects.get(player_name__iexact=formatted_name)
+                else:
+                    raise Pitcher.DoesNotExist
+            
             validated_data['pitcher'] = pitcher
             return super().create(validated_data)
         except Pitcher.DoesNotExist:
