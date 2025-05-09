@@ -76,6 +76,23 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=False, methods=['get'])
+    def get_all_favorites(self, request):
+        try:
+            favorites = self.get_queryset()
+            serializer = self.get_serializer(favorites, many=True)
+            logger.info(f"Retrieved {len(favorites)} favorites for user {request.user.username}")
+            return Response({
+                'favorites': serializer.data,
+                'count': len(favorites)
+            })
+        except Exception as e:
+            logger.error(f"Error retrieving favorites: {str(e)}", exc_info=True)
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     @action(detail=False, methods=['delete'])
     def clear_all(self, request):
         try:
