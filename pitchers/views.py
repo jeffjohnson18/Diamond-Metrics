@@ -146,6 +146,8 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
         log_request(request, "FavoritePitcherViewSet.save_favorites")
         try:
             username = request.query_params.get('username')
+            logger.info(f"Processing request for username: {username}")
+            
             if not username:
                 response = Response(
                     {'detail': 'username parameter is required'},
@@ -156,7 +158,9 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
 
             try:
                 user = User.objects.get(username=username)
+                logger.info(f"Found user: {user.username} (ID: {user.id})")
             except User.DoesNotExist:
+                logger.error(f"User not found: {username}")
                 response = Response(
                     {'detail': f'User {username} not found'},
                     status=status.HTTP_404_NOT_FOUND
@@ -165,6 +169,8 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
                 return response
 
             pitcher_names = request.data.get('pitcher_names', [])
+            logger.info(f"Received pitcher names: {pitcher_names}")
+            
             if not pitcher_names:
                 response = Response(
                     {'detail': 'pitcher_names array cannot be empty'},
@@ -176,34 +182,51 @@ class FavoritePitcherViewSet(viewsets.ModelViewSet):
             logger.info(f"Attempting to save favorites for user {username}: {pitcher_names}")
             
             # Clear existing favorites
-            FavoritePitcher.objects.filter(user=user).delete()
-            logger.info("Cleared existing favorites")
+            deleted_count = FavoritePitcher.objects.filter(user=user).delete()
+            logger.info(f"Cleared existing favorites. Deleted count: {deleted_count}")
 
             # Create new favorites
             saved_favorites = []
             for name in pitcher_names:
                 try:
-                    # Try to get existing pitcher or create new one
+                    logger.info(f"Processing pitcher: {name}")
+                    # Try to get existing pitcher or create new one with default values
                     pitcher, created = Pitcher.objects.get_or_create(
                         player_name=name,
                         defaults={
                             'player_name': name,
-                            # Add any other required fields with default values
+                            'player_image': 'https://example.com/default.jpg',
+                            'team_name': 'Unknown Team',
+                            'team_logo': 'https://example.com/default_logo.jpg',
+                            'stand_side': 'R',
+                            'pitch_type': 'FB',
+                            'velocity_range': '90-95',
+                            'usage_rate': '0%',
+                            'zone_rate': '0%',
+                            'avg_spin_rate': 0.0,
+                            'avg_horz_break': 0.0,
+                            'avg_induced_vert_break': 0.0,
+                            'arm_angle': 0.0,
+                            'throws': 'R',
+                            'heatmap_path': '/default/heatmap.png'
                         }
                     )
                     if created:
-                        logger.info(f"Created new pitcher record for {name}")
+                        logger.info(f"Created new pitcher record for {name} (ID: {pitcher.id})")
+                    else:
+                        logger.info(f"Found existing pitcher record for {name} (ID: {pitcher.id})")
                     
                     favorite = FavoritePitcher.objects.create(
                         user=user,
                         pitcher=pitcher
                     )
+                    logger.info(f"Created favorite record (ID: {favorite.id}) for {pitcher.player_name}")
+                    
                     saved_favorites.append({
                         'pitcher_name': pitcher.player_name
                     })
-                    logger.info(f"Created favorite for {pitcher.player_name}")
                 except Exception as e:
-                    logger.error(f"Error creating favorite for {name}: {str(e)}")
+                    logger.error(f"Error creating favorite for {name}: {str(e)}", exc_info=True)
                     continue
 
             logger.info(f"Successfully saved {len(saved_favorites)} favorites")
